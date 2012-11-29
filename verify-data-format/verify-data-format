@@ -1,0 +1,72 @@
+#!/usr/bin/python
+""" Verifies indivial fields in large text file (csv, log file)
+    and deletes the wrong ones.
+
+    Usage example:
+    cat big_log.txt | ./verify-data-format 1> cleaned_big_log.txt 2> erros_big_log.txt
+"""
+import sys
+import fileinput
+from optparse import OptionParser
+
+DEF_CHKS = (
+    ("guid is wrong", "len(x)==32"),
+    ("impr<1",        "int(x) > 1"),
+    ("links<0",       "int(x) >= 0"),
+    ("words<0",       "int(x) >= 0"),
+    ("domains<0",     "int(x) >= 0"),
+    ("publishers<0",  "int(x) >= 0"),
+    ("tsvar<0",       "float(x) >= 0"),
+    ("jsvar is not float", "float(x) or True"),  # don't care about value, x should be float and 0.0 is a valid value
+    ("jsav is not float",  "float(x) or True")
+)
+
+
+def parse_checks(strchecks):
+    """TBD, that's really naive"""
+    if type(strchecks) is str:
+        return eval(strchecks)
+    else:
+        return strchecks
+
+
+def verify(checks, splitter, fout=sys.stdout, ferr=sys.stderr):
+    def activate_checks(checks):
+        """Converts checks into lambda functions, has to be done once"""
+        return tuple([(c[0], eval("lambda x: " + c[1])) for c in checks])
+
+    def verify_single_record(record, counter):
+        """ Parses a single record and runs indivdual checks for fields """
+        try:
+            items = record.split(splitter)
+            assert len(items) == dim, "wrong number of items in a record"
+            for i in xrange(dim):
+                assert checks[i][1](items[i]), "Field:%d, Error:%s" % (i + 1, checks[i][0])
+
+            print >> fout, record,
+        except:
+            print >> ferr, 'Line %d: "%s"' % (counter, record.strip())
+            print >> ferr, sys.exc_value
+
+    #Precalculate once to optimise the runtime
+    checks = activate_checks(checks)
+    dim = len(checks)
+
+    #Iterate over the lines of all files listed in sys.argv[1:], defaulting to sys.stdin if the list is empty.
+    #If a filename is '-', it is also replaced by sys.stdin.
+    counter = 0
+    for record in fileinput.input():
+        counter += 1
+        verify_single_record(record, counter)
+
+if __name__ == "__main__":
+    """Read from stdin"""
+    parser = OptionParser()
+    parser.add_option("-s", "--splitter",  dest="splitter", default='\t',
+                      help="fields separator in a record, default is '\\t'", metavar="SPLITTER")
+    parser.add_option("-c", "--checks", dest="checks", default=DEF_CHKS,
+                      help="list of checks for each field")
+    (options, args) = parser.parse_args()
+
+    checks = parse_checks(options.checks)
+    verify(checks, splitter=options.splitter, fout=sys.stdout, ferr=sys.stderr)
