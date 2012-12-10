@@ -6,6 +6,7 @@
     cat big_log.txt | ./verify-data-format 1> cleaned_big_log.txt 2> erros_big_log.txt
 """
 import sys
+import ast
 import fileinput
 from optparse import OptionParser
 
@@ -25,12 +26,13 @@ DEF_CHKS = (
 def parse_checks(strchecks):
     """TBD, that's really naive"""
     if type(strchecks) is str:
-        return eval(strchecks)
+        print >> sys.stderr, 'Parsing checks:', strchecks
+        return ast.literal_eval(strchecks)
     else:
         return strchecks
 
 
-def verify(checks, splitter, fout=sys.stdout, ferr=sys.stderr):
+def verify(checks, files, splitter):
     def activate_checks(checks):
         """Converts checks into lambda functions, has to be done once"""
         return tuple([(c[0], eval("lambda x: " + c[1])) for c in checks])
@@ -42,11 +44,10 @@ def verify(checks, splitter, fout=sys.stdout, ferr=sys.stderr):
             assert len(items) == dim, "wrong number of items in a record"
             for i in xrange(dim):
                 assert checks[i][1](items[i]), "Field:%d, Error:%s" % (i + 1, checks[i][0])
-
-            print >> fout, record,
+            print >> sys.stdout, record,
         except:
-            print >> ferr, 'Line %d: "%s"' % (counter, record.strip())
-            print >> ferr, sys.exc_value
+            print >> sys.stderr, 'Line %d: "%s"' % (counter, record.strip())
+            print >> sys.stderr, sys.exc_value
 
     #Precalculate once to optimise the runtime
     checks = activate_checks(checks)
@@ -55,7 +56,7 @@ def verify(checks, splitter, fout=sys.stdout, ferr=sys.stderr):
     #Iterate over the lines of all files listed in sys.argv[1:], defaulting to sys.stdin if the list is empty.
     #If a filename is '-', it is also replaced by sys.stdin.
     counter = 0
-    for record in fileinput.input():
+    for record in fileinput.input(files):
         counter += 1
         verify_single_record(record, counter)
 
@@ -66,7 +67,7 @@ if __name__ == "__main__":
                       help="fields separator in a record, default is '\\t'", metavar="SPLITTER")
     parser.add_option("-c", "--checks", dest="checks", default=DEF_CHKS,
                       help="list of checks for each field")
-    (options, args) = parser.parse_args()
+    (options, files) = parser.parse_args()
 
     checks = parse_checks(options.checks)
-    verify(checks, splitter=options.splitter, fout=sys.stdout, ferr=sys.stderr)
+    verify(checks, files, splitter=options.splitter)
