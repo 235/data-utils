@@ -1,0 +1,91 @@
+#!/usr/bin/env python
+""" Plots PDFs and CDFs for each column of data on input
+
+    echo -e "12413 1\n234 4\n32 3" | ./pdfs
+"""
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator, FuncFormatter
+import fileinput
+from optparse import OptionParser
+#from generic_plot import *
+
+
+def pdfs(data, logscale=True):
+    numvars, numdata = data.shape
+    print 'Number of dimensions: %d, each of %d  elements' % (numvars, numdata)
+    nbins = 500
+
+    MINS = []
+    MAXS = []
+    for i in range(numvars):
+        MINS.append(min(data[i]))
+        MAXS.append(max(data[i]))
+        print 'dim %d MIN = %f, MAX = %f' % (i, MINS[i], MAXS[i])
+
+    n = numvars if numvars > 1 else 2  # Nasty feature of axes - no matrix idexing if dimension is lower than 2
+    fig, axes = plt.subplots(nrows=n, ncols=2)  # , figsize=(12, 12))
+    if numvars == 1:
+        axes[n - 1, 0].axis('off')
+        axes[n - 1, 1].axis('off')
+    fig.subplots_adjust(hspace=0.5, wspace=0.3)
+
+    for i in xrange(numvars):
+        print i
+        if logscale:
+            bins = np.logspace(np.log10(MINS[i]), np.log10(MAXS[i]), nbins)
+        else:
+            bins = np.linspace(MINS[i], MAXS[i], nbins)
+
+        seq = data[i]
+        print 'First 10 elements: ', seq[0:10]
+        pdf, bins, patches = axes[(i, 0)].hist(seq, bins=bins, lw=3)
+        pdf, bins, patches = axes[(i, 1)].hist(seq, bins=bins, lw=3, cumulative=-1,
+            normed=1, color='g')
+        axes[i, 1].axhline(y=0.2, linewidth=2, color='r')
+
+        print 'Is it normalised (=1)? ', np.sum(pdf *  np.diff(bins))
+
+        for j in (0, 1):
+            axes[i, j].set_xlabel('%s ' % ('CDF' if j else 'PDF', ))
+            axes[i, j].xaxis.set_major_locator(MaxNLocator(4))
+            axes[i, j].yaxis.set_major_locator(MaxNLocator(4))
+        axes[i, 0].set_ylabel('Data column %i ' % (i, ))
+
+        if logscale:
+            axes[i, 0].set_yscale('log')
+            axes[i, 0].set_xscale('log')
+            axes[i, 1].set_xscale('log')
+
+        axes[i, 0].set_xlim([MINS[i], MAXS[i]])
+        axes[i, 1].set_xlim([MINS[i], MAXS[i]])
+        formatter = FuncFormatter(lambda x, pos: '%d%%' % int(x * 100))
+        axes[i, 1].yaxis.set_major_formatter(formatter)
+
+        print ' completed'
+
+    return fig
+
+
+def load_data(files, splitter=" "):
+    data = []
+    for line in fileinput.input(files):
+        data.append([float(i) for i in line.strip().split(splitter)])
+    data = np.transpose(data)
+    return data
+
+
+def makeplot(files, logscale):
+    data = load_data(files)
+    pdfs(data, logscale)
+    plt.show()
+    #from IPython import embed; embed()
+
+
+if __name__ == "__main__":
+    parser = OptionParser()
+    parser.add_option("-l", "--log",
+                    action="store_true", dest="logscale", default=False,
+                    help="plots on logscale")
+    (options, files) = parser.parse_args()
+    makeplot(files, options.logscale)
