@@ -14,7 +14,7 @@ import sys
 import fileinput
 from optparse import OptionParser
 
-# Get here:
+# Get it here:
 # http://mxr.mozilla.org/mozilla/source/netwerk/dns/src/effective_tld_names.dat?raw=1
 EFFECTIVE_TLD = "effective_tld_names.dat"
 
@@ -57,17 +57,14 @@ def get_domain(url, tlds):
 
 
 def tokenize_plain_text(data):
-    # no dot in splitters!
+    # dot not add a dot to splitters!
     splitters = ' /\'",;\t\n=(){}[]|\\`!@#$%^&*+'
     data = [data, ]
     for s in list(splitters):
         data = [x.strip() for d in data for x in d.split(s)]
-    # remove empty
-    data = filter(lambda x: len(x) > 0, data)
-    # remove edge dots
-    data = [d.strip('.').lower() for d in data]
-    # remove those that do not have dots
-    data = filter(lambda x: '.' in x, data)
+    data = filter(lambda x: len(x) > 0, data)    # remove empty
+    data = [d.strip('.').lower() for d in data]  # remove edge dots
+    data = filter(lambda x: '.' in x, data)      # remove those that do not have dots
     #print 'tokens: ', data
     return data
 
