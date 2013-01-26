@@ -1,13 +1,20 @@
 #!/usr/bin/env python
 """
 Convert URLs to domains
+
+
+  echo -e "dfhgfdh\nhttp://samoanic.ws/index.dhtml sdfg  sdfsf dfgdfgs.com http:// docs.python.org/" | ./url2domain -x -q
+    samoanic.ws
+    dfgdfgs.com
+    python.org
+
+
 """
 import sys
 import fileinput
-from urlparse import urlparse
 from optparse import OptionParser
 
-# Get here:
+# Get it here:
 # http://mxr.mozilla.org/mozilla/source/netwerk/dns/src/effective_tld_names.dat?raw=1
 EFFECTIVE_TLD = "effective_tld_names.dat"
 
@@ -20,7 +27,14 @@ def get_tlds():
 
 def get_domain(url, tlds):
     # Credits to http://stackoverflow.com/questions/1066933/how-to-extract-domain-name-from-url
-    url_elements = urlparse(url)[1].split('.')
+    # from urlparse import urlparse
+    # url_elements = urlparse(url)[1].split('.')
+
+    # No, we use simpler split since we might have links without 'http://'
+    url_elements = url.split('.')
+    if len(url_elements) < 2:
+        raise ValueError("Domain candidate is too short")
+    # print "\t", url, url_elements
     # url_elements = ["abcde","co","uk"]
 
     for i in range(-len(url_elements), 0):
@@ -42,29 +56,59 @@ def get_domain(url, tlds):
     raise ValueError("Domain not in global list of TLDs")
 
 
-def check_pipe(files, field=-1, spliter=", "):
-    """Reads URLS from stdin one per line"""
-    tlds = get_tlds()
-    counter = 0
+def tokenize_plain_text(data):
+    # dot not add a dot to splitters!
+    splitters = ' /\'",;\t\n=(){}[]|\\`!@#$%^&*+'
+    data = [data, ]
+    for s in list(splitters):
+        data = [x.strip() for d in data for x in d.split(s)]
+    data = filter(lambda x: len(x) > 0, data)    # remove empty
+    data = [d.strip('.').lower() for d in data]  # remove edge dots
+    data = filter(lambda x: '.' in x, data)      # remove those that do not have dots
+    #print 'tokens: ', data
+    return data
 
-    for line in fileinput.input(files):
-        if field > -1:
-            url = line.split(spliter)[field]
-        else:
-            url = line
-        counter += 1
+
+def check_pipe(files, field=-1, extract=False, splitter=", ", quiet=False):
+    def check_single_candidate(line):
+        url = line.split(splitter)[field] if field > -1 else line
         try:
             if field > -1:
-                print >> sys.stdout, line[:field - 1] + get_domain(url, tlds) + line[field:]  # , '\t', url.strip()
+                print >> sys.stdout, splitter.join(line[:field - 1] + get_domain(url, tlds) + line[field:])
             else:
-                print >> sys.stdout, get_domain(url, tlds)  # , '\t', url.strip()
+                print >> sys.stdout, get_domain(url, tlds)
         except ValueError:
-            print >> sys.stdout, counter, url
+            if not quiet:
+                print >> sys.stdout, 'Wrong url "%s" on line %d' % (url.strip(), counter)
+    """Reads URLS from stdin one per line"""
+    if field > -1 and not extract:
+        print >> sys.stderr, 'Cannot use -f and -x options simultaneously!'
+        sys.exit()
+
+    tlds = get_tlds()
+    counter = 0
+    for line in fileinput.input(files):
+        counter += 1
+        if extract:
+            [check_single_candidate(token) for token in tokenize_plain_text(line)]
+        else:
+            check_single_candidate(line)
 
 if __name__ == "__main__":
     parser = OptionParser()
     parser.add_option("-f", "--field",  dest="field", default=-1,
-                      help="Number of field to convert inplace (starting 0), by default assume the data is single-columned", metavar="field")
+                    help="Field number which should be convert inplace (starting 0), by default assume the data is single-columned",
+                    metavar="field")
+    parser.add_option("-s", "--splitter",  dest="splitter", default=", ",
+                    help="Column splitter (use with -f option)",
+                    metavar="splitter")
+    parser.add_option("-x", "--extract",
+                    action="store_true", dest="extract", default=False,
+                    help="Extract domains from plain text")
+    parser.add_option("-q", "--quiet",
+                    action="store_true", dest="quiet", default=False,
+                    help="Do not pring error messages")
     (options, files) = parser.parse_args()
 
-    check_pipe(files, field=options.field)
+    check_pipe(files, field=options.field, extract=options.extract,
+        splitter=options.splitter, quiet=options.quiet)

@@ -11,7 +11,7 @@ from optparse import OptionParser
 #from generic_plot import *
 
 
-def pdfs(data, logscale=True):
+def pdfs(data, logscale=True, caption="Data"):
     numvars, numdata = data.shape
     print 'Number of dimensions: %d, each of %d  elements' % (numvars, numdata)
     nbins = 500
@@ -50,7 +50,7 @@ def pdfs(data, logscale=True):
             axes[i, j].set_xlabel('%s ' % ('CDF' if j else 'PDF', ))
             axes[i, j].xaxis.set_major_locator(MaxNLocator(4))
             axes[i, j].yaxis.set_major_locator(MaxNLocator(4))
-        axes[i, 0].set_ylabel('Data column %i ' % (i, ))
+        axes[i, 0].set_ylabel(caption + ' (column %i)' % (i, ))
 
         if logscale:
             axes[i, 0].set_yscale('log')
@@ -75,9 +75,9 @@ def load_data(files, splitter=" "):
     return data
 
 
-def makeplot(files, logscale):
+def makeplot(files, logscale, caption):
     data = load_data(files)
-    pdfs(data, logscale)
+    pdfs(data, logscale, caption)
     plt.show()
     #from IPython import embed; embed()
 
@@ -87,5 +87,8 @@ if __name__ == "__main__":
     parser.add_option("-l", "--log",
                     action="store_true", dest="logscale", default=False,
                     help="plots on logscale")
+    parser.add_option("-c", "--caption",  dest="caption", default="Data",
+                    help="X label on plot",
+                    metavar="caption")
     (options, files) = parser.parse_args()
-    makeplot(files, options.logscale)
+    makeplot(files, options.logscale, caption=options.caption)
